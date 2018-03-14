@@ -1,0 +1,401 @@
+import urllib3
+from urllib import parse
+import requests
+import hashlib
+import base64
+import json
+import shutil
+import logging
+import rsa
+
+from OpenSSL import crypto
+from unionpay.SDKConfig import SDKConfig
+from unionpay.CertUtil import CertUtil
+from unionpay.sm3 import sm3
+
+
+def post(url, url_args):
+    data_dict = parse.parse_qs(url_args)
+    logging.debug("Post URL: " + url)
+
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    if SDKConfig().ifValidateRemoteCert.lower() == "false":
+        r = requests.post(url, data=data_dict, verify=False)
+    else:
+        r = requests.post(url, data=data_dict)
+
+    if r.status_code != 200:
+        logging.error("request to {} error: {}".format(url, r.status_code))
+        return None
+
+    return r.text
+
+
+def createLinkString(para, sort, encode):
+    linkString = ""
+    keys = para.keys()
+    if (sort):
+        keys = sorted(keys)
+    for key in keys:
+        value = para[key]
+        if encode:
+            value = parse.quote(value)
+        linkString = linkString + key + "=" + value + "&"
+    linkString = linkString[:-1]
+    return linkString
+
+
+def filterNoneValue(para):
+    keys = para.keys()
+    for key in keys:
+        value = para[key]
+        if value is None or value == "":
+            para.pop(key)
+
+
+def buildSignature(req, signCertPath=SDKConfig().signCertPath, signCertPwd=SDKConfig().signCertPwd,
+                   secureKey=SDKConfig().secureKey):
+    filterNoneValue(req)
+
+    if "signMethod" not in req:
+        logging.error("signMethod must not null")
+        return None
+
+    if "version" not in req:
+        logging.error("version must not null")
+        return None
+
+    if "01" == req["signMethod"]:
+        req["certId"] = CertUtil.getSignCertId(signCertPath, signCertPwd)
+        logging.info("=== start to sign ===")
+        prestr = createLinkString(req, True, False)
+        logging.info("sorted: [" + prestr + "]")
+        if "5.0.0" == req["version"]:
+            prestr = sha1(prestr)
+            logging.info("sha1: [" + prestr + "]")
+            logging.info("sign cert: [" + signCertPath + "], pwd: [" + signCertPwd + "]")
+            key = CertUtil.getSignPriKey(signCertPath, signCertPwd)
+            signature = base64.b64encode(crypto.sign(key, prestr.encode(SDKConfig().encoding), 'sha1'))
+            logging.info("signature: [" + signature + "]")
+        else:
+            prestr = sha256(prestr)
+            logging.info("sha256: [" + prestr + "]")
+            logging.info("sign cert: [" + signCertPath + "], pwd: [" + signCertPwd + "]")
+            key = CertUtil.getSignPriKey(signCertPath, signCertPwd)
+            signature = base64.b64encode(crypto.sign(key, prestr.encode(SDKConfig().encoding), 'sha256'))
+            logging.info("signature: [" + signature + "]")
+    elif "11" == req["signMethod"]:
+        logging.info("=== start to sign ===")
+        prestr = createLinkString(req, True, False)
+        logging.info("sorted: [" + prestr + "]")
+        if secureKey is None:
+            logging.error("secureKey must not null")
+            return None
+        prestr = prestr + "&" + sha256(secureKey)
+        logging.debug("before final sha256: [" + prestr + "]")
+        signature = sha256(prestr)
+        logging.info("signature: [" + signature + "]")
+    elif "12" == req["signMethod"]:
+        # logging.info("=== start to sign ===")
+        # prestr = createLinkString(req, True, False)
+        # logging.info("sorted: [" + prestr + "]")
+        # if secureKey is None:
+        #     logging.error("secureKey must not null")
+        #     return None
+        # prestr = prestr + "&" + sm3(secureKey)
+        # logging.debug("before final sm3: [" + prestr + "]")
+        # signature = sm3(prestr)
+        # logging.info("signature: [" + signature + "]")
+        logging.error("sm3算法暂未实现，请勿使用。")
+        return None
+    else:
+        logging.info("invalid signMethod: [" + req["signMethod"] + "]")
+    logging.info("=== end of sign ===")
+    req["signature"] = signature
+    return signature
+
+
+def paraFilter(para):
+    result = {}
+    for key in para.keys():
+        if (key == "signature" or para[key] == ""):
+            continue
+        else:
+            result[key] = para[key]
+    return result
+
+
+def sha1(data):
+    return hashlib.sha1(data).hexdigest()
+
+
+def sha256(data):
+    return hashlib.sha256(data).hexdigest()
+
+
+def putKeyValueToMap(temp, isKey, key, m):
+    if isKey:
+        m[str(key)] = ""
+    else:
+        m[str(key)] = temp
+
+
+def parseQString(respString):
+    resp = {}
+    temp = ""
+    key = ""
+    isKey = True
+    isOpen = False
+    openName = "\0"
+
+    for curChar in respString:  # 遍历整个带解析的字符串
+        if (isOpen):
+            if (curChar == openName):
+                isOpen = False
+            temp = temp + curChar
+        elif (curChar == "{"):
+            isOpen = True
+            openName = "}"
+            temp = temp + curChar
+        elif (curChar == "["):
+            isOpen = True
+            openName = "]"
+            temp = temp + curChar
+        elif (isKey and curChar == "="):
+            key = temp
+            temp = ""
+            isKey = False
+        elif (curChar == "&" and not isOpen):  # 如果读取到&分割符
+            putKeyValueToMap(temp, isKey, key, resp)
+            temp = ""
+            isKey = True
+        else:
+            temp = temp + curChar
+
+    putKeyValueToMap(temp, isKey, key, resp)
+    return resp
+
+
+def verify(resp):
+    if "signMethod" not in resp:
+        logging.error("signMethod must not null")
+        return None
+
+    if "version" not in resp:
+        logging.error("version must not null")
+        return None
+
+    if "signature" not in resp:
+        logging.error("signature must not null")
+        return None
+
+    signMethod = resp["signMethod"]
+    version = resp["version"]
+    result = False
+
+    if "01" == signMethod:
+        logging.info("=== start to verify signature ===")
+        if "5.0.0" == version:
+            signature = resp.pop("signature")
+            logging.info("signature: [" + signature + "]")
+            prestr = createLinkString(resp, True, False)
+            logging.info("sorted: [" + prestr + "]")
+            prestr = sha1(prestr)
+            logging.info("sha1: [" + prestr + "]")
+            cert = CertUtil.getVerifyCertFromPath(resp["certId"])
+            if cert is None:
+                logging.info("no cert was found by certId: " + resp["certId"])
+                result = False
+            else:
+                signature = base64.b64decode(signature)
+                try:
+                    crypto.verify(cert, signature, prestr, 'sha1')
+                    result = True
+                except Exception:
+                    result = False
+        else:
+            signature = resp.pop("signature")
+            logging.info("signature: [" + signature + "]")
+            prestr = createLinkString(resp, True, False)
+            logging.info("sorted: [" + prestr + "]")
+            prestr = sha256(prestr)
+            logging.info("sha256: [" + prestr + "]")
+            cert = CertUtil.verifyAndGetVerifyCert(resp["signPubKeyCert"])
+            if cert is None:
+                logging.info("no cert was found by signPubKeyCert: " + resp["signPubKeyCert"])
+                result = False
+            else:
+                signature = base64.b64decode(signature)
+                try:
+                    crypto.verify(cert, signature, prestr, 'sha256')
+                    result = True
+                except Exception:
+                    result = False
+        logging.info("verify signature " + "succeed" if result else "fail")
+        logging.info("=== end of verify signature ===")
+        return result
+    elif "11" == signMethod or "12" == signMethod:
+        return verifyBySecureKey(resp, SDKConfig().secureKey)
+    else:
+        logging.info("Error signMethod [" + signMethod + "] in validate. ")
+        return False
+
+
+def verifyBySecureKey(resp, secureKey):
+    if "signMethod" not in resp:
+        logging.error("signMethod must not null")
+        return None
+
+    if "signature" not in resp:
+        logging.error("signature must not null")
+        return None
+
+    signMethod = resp["signMethod"]
+    result = False
+
+    logging.info("=== start to verify signature ===")
+    if "11" == signMethod:
+        signature = resp.pop("signature")
+        logging.info("signature: [" + signature + "]")
+        prestr = createLinkString(resp, True, False)
+        logging.info("sorted: [" + prestr + "]")
+        beforeSha256 = prestr + "&" + sha256(secureKey)
+        logging.debug("before final sha256: [" + beforeSha256 + "]")
+        afterSha256 = sha256(beforeSha256)
+        result = afterSha256 == signature
+        if not result:
+            logging.debug("after final sha256: [" + afterSha256 + "]")
+    elif "12" == signMethod:
+        signature = resp.pop("signature")
+        logging.info("signature: [" + signature + "]")
+        prestr = createLinkString(resp, True, False)
+        logging.info("sorted: [" + prestr + "]")
+        beforeSm3 = prestr + "&" + sm3(secureKey)
+        logging.debug("before final sm3: [" + beforeSm3 + "]")
+        afterSm3 = sm3(beforeSm3)
+        result = afterSm3 == signature
+        if not result:
+            logging.debug("after final sha256: [" + afterSm3 + "]")
+    logging.info("verify signature " + "succeed" if result else "fail")
+    logging.info("=== end of verify signature ===")
+    return result
+
+
+def verifyAppResponse(jsonData):
+    data = json.loads(jsonData)
+    sign = data["sign"]
+    data = data["data"]
+    dataMap = parseQString(data)
+    vCert = CertUtil.getVerifyCertFromPath(dataMap["cert_id"])
+    signature = base64.b64decode(sign)
+    return crypto.verify(vCert, signature, sha1(data), 'sha1')
+
+
+def createAutoFormHtml(params, reqUrl):
+    result = "<html>\
+<head>\
+    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=" + SDKConfig().encoding + "\" />\
+</head>\
+<body onload=\"javascript:document.pay_form.submit();\">\
+    <form id=\"pay_form\" name=\"pay_form\" action=\"" + reqUrl + "\" method=\"post\">"
+    for key, value in params.iteritems():
+        result = result + "    <input type=\"hidden\" name=\"" + key + "\" id=\"" + key + "\" value=\"" + value + "\" />\n";
+    result = result + "<!-- <input type=\"submit\" type=\"hidden\">-->\
+    </form>\
+</body>\
+</html>"
+    logging.info("auto post html:" + result)
+    return result
+
+
+def encryptPub(data, certPath=SDKConfig().encryptCertPath):
+    rsaKey = CertUtil.getEncryptKey(certPath)
+    result = rsa.encrypt(data, rsaKey)
+    result = base64.b64encode(result)
+    return result
+
+
+def decryptPri(data, certPath=SDKConfig().signCertPath, certPwd=SDKConfig().signCertPwd):
+    pkey = CertUtil.getDecryptPriKey(certPath, certPwd)
+    data = base64.b64decode(data)
+    result = rsa.decrypt(data, pkey)
+    return result
+
+
+def deCodeFileContent(params, fileDirectory):
+    if not params.has_key("fileContent"):
+        return False
+    logging.info("---------处理后台报文返回的文件---------")
+    fileContent = params["fileContent"]
+    if not fileContent:
+        logging.info("文件内容为空")
+        return False
+    fileContent = base64.b64decode(fileContent).decode('zlib')  # python3: zlib.decompress(data)
+    filePath = ""
+    if not params.has_key("fileName"):
+        logging.info("文件名为空")
+        filePath = fileDirectory + params["merId"] + "_" + params["batchNo"] + "_" + params["txnTime"] + ".txt"
+    else:
+        filePath = fileDirectory + params['fileName']
+    output = open(filePath, 'wb')
+    output.write(fileContent)
+    logging.info("文件位置 >:" + filePath)
+    output.close()
+    return True
+
+
+def enCodeFileContent(path):
+    file = open(path, "rb")
+    fileContent = file.read()
+    file.close()
+    fileContent = fileContent.encode('zlib')
+    fileContent = base64.b64encode(fileContent)
+    return fileContent
+
+
+def getEncryptCert(params):
+    if "encryptPubKeyCert" not in params or "certType" not in params:
+        logging.error("encryptPubKeyCert or certType is null")
+        return -1
+    strCert = params["encryptPubKeyCert"]
+    certType = params["certType"]
+
+    x509Cert = crypto.load_certificate(crypto.FILETYPE_PEM, strCert)
+    if "01" == certType:
+        # 更新敏感信息加密公钥
+        if str(x509Cert.get_serial_number()) == CertUtil.getEncryptCertId():
+            return 0
+        else:
+            localCertPath = SDKConfig().encryptCertPath
+            newLocalCertPath = genBackupName(localCertPath)
+            # 将本地证书进行备份存储
+            try:
+                shutil.move(localCertPath, newLocalCertPath)
+            except Exception as e:
+                logging.error("备份旧加密证书失败。" + e)
+                return -1
+            # 备份成功,进行新证书的存储
+            try:
+                f = file(localCertPath, "w+")
+                f.write(strCert)
+                f.close()
+            except Exception as e:
+                logging.error("写入新加密证书失败。" + e)
+                return -1
+
+            logging.info("save new encryptPubKeyCert success");
+            CertUtil.resetEncryptCertPublicKey();
+            return 1;
+    elif "02" == certType:
+        return 0;
+    else:
+        logging.error("unknown cerType:" + certType)
+        return -1
+
+
+def genBackupName(fileName):
+    i = fileName.rfind(".")
+    leftFileName = fileName[0: i]
+    rightFileName = fileName[i + 1:]
+    newFileName = leftFileName + "_backup" + "." + rightFileName
+    return newFileName
