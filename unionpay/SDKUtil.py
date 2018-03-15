@@ -316,11 +316,11 @@ def createAutoFormHtml(params, reqUrl):
 <head>\
     <meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\" />\
 </head>\
-<body onload=\"javascript:document.pay_form.submit();\">\
+<body>\
     <form id=\"pay_form\" name=\"pay_form\" action=\"" + reqUrl + "\" method=\"post\">"
     for key, value in params.items():
         result = result + "    <input type=\"hidden\" name=\"" + key + "\" id=\"" + key + "\" value=\"" + value + "\" />\n";
-    result = result + "<!-- <input type=\"submit\" type=\"hidden\">-->\
+    result = result + "<input type=\"submit\">submit</input>\
     </form>\
 </body>\
 </html>"

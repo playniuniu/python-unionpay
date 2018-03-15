@@ -45,7 +45,7 @@ class SDKConfig():
         self.middleCertPath = cf.get("acpsdk.middleCert.path", "").strip()
         self.frontUrl = cf.get("acpsdk.frontUrl", "").strip()
         self.backUrl = cf.get("acpsdk.backUrl", "").strip()
-        self.encoding = cf.get("acpsdk.encoding", "").strip()
+        self.encoding = cf.get("acpsdk.encoding", "utf-8").strip()
         self.secureKey = cf.get("acpsdk.secureKey", "").strip()
 
     def __setattr__(self, attr, value):
