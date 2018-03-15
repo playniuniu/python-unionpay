@@ -5,8 +5,6 @@ from unionpay.CertUtil import CertUtil
 
 
 class AcpService():
-    def __init__(self):
-        pass
 
     @staticmethod
     def sign(req, certPath=SDKConfig().signCertPath, certPwd=SDKConfig().signCertPwd):
@@ -46,7 +44,7 @@ class AcpService():
     @staticmethod
     def validateAppResponse(jsonData):
         '''
-        （此方法已弃用。控件返回信息请在手机端验证。）
+        此方法已弃用。控件返回信息请在手机端验证。
         对控件支付成功返回的结果信息中data域进行验签
         '''
         return SDKUtil.verifyAppResponse(jsonData)
@@ -64,9 +62,11 @@ class AcpService():
 
     @staticmethod
     def getCustomerInfo(customerInfo):
-        if (customerInfo == None or customerInfo.length == 0):
+        if customerInfo == None or customerInfo.length == 0:
             return ""
-        return base64.b64encode("{" + SDKUtil.createLinkString(customerInfo, False, False) + "}")
+        b64_str = "{" + SDKUtil.createLinkString(customerInfo, False, False) + "}"
+        b64_data = base64.b64encode(b64_str.encode('utf-8'))
+        return b64_data.decode('utf-8')
 
     @staticmethod
     def getCustomerInfoWithEncrypt(customerInfo):
@@ -79,14 +79,20 @@ class AcpService():
         encryptedInfo = {}
         for key in customerInfo.keys():
             if key == 'phoneNo' or key == 'cvn2' or key == 'expired':
-                encryptedInfo[key] = customerInfo.pop(key)
+                encryptedInfo[key] = customerInfo[key]
+
+        del customerInfo['phoneNo']
+        del customerInfo['cvn2']
+        del customerInfo['expired']
 
         if len(encryptedInfo):
             encryptedInfo = SDKUtil.createLinkString(encryptedInfo, False, False)
             encryptedInfo = AcpService.encryptData(encryptedInfo, SDKConfig().encryptCertPath)
             customerInfo["encryptedInfo"] = encryptedInfo
 
-        return base64.b64encode("{" + SDKUtil.createLinkString(customerInfo, False, False) + "}")
+        b64_str = "{" + SDKUtil.createLinkString(customerInfo, False, False) + "}"
+        b64_data = base64.b64encode(b64_str.encode('utf-8'))
+        return b64_data.decode('utf-8')
 
     @staticmethod
     def parseCustomerInfo(customerInfostr, certPath=SDKConfig().signCertPath, certPwd=SDKConfig().signCertPwd):
@@ -97,7 +103,7 @@ class AcpService():
         customerInfostr = base64.b64decode(customerInfostr)
         customerInfostr = customerInfostr[1:len(customerInfostr) - 1]
         customerInfo = SDKUtil.parseQString(customerInfostr)
-        if ('encryptedInfo' in customerInfo.keys()):
+        if 'encryptedInfo' in customerInfo:
             encryptedInfoStr = customerInfo.pop("encryptedInfo")
             encryptedInfoStr = AcpService.decryptData(encryptedInfoStr, certPath, certPwd)
             encryptedInfo = SDKUtil.parseQString(encryptedInfoStr)
