@@ -7,6 +7,7 @@ import json
 import shutil
 import logging
 import rsa
+import zlib
 
 from OpenSSL import crypto
 from unionpay.SDKConfig import SDKConfig
@@ -40,22 +41,27 @@ def createLinkString(para, sort, encode):
         value = para[key]
         if encode:
             value = parse.quote(value)
-        linkString = linkString + key + "=" + value + "&"
+        linkString += (key + "=" + value + "&")
     linkString = linkString[:-1]
     return linkString
 
 
 def filterNoneValue(para):
+    res_dict = {}
     keys = para.keys()
     for key in keys:
         value = para[key]
         if value is None or value == "":
-            para.pop(key)
+            continue
+        res_dict[key] = value
+    return res_dict
 
 
-def buildSignature(req, signCertPath=SDKConfig().signCertPath, signCertPwd=SDKConfig().signCertPwd,
+def buildSignature(req_dict, signCertPath=SDKConfig().signCertPath,
+                   signCertPwd=SDKConfig().signCertPwd,
                    secureKey=SDKConfig().secureKey):
-    filterNoneValue(req)
+    req = filterNoneValue(req_dict)
+    signature = ""
 
     if "signMethod" not in req:
         logging.error("signMethod must not null")
@@ -67,27 +73,35 @@ def buildSignature(req, signCertPath=SDKConfig().signCertPath, signCertPwd=SDKCo
 
     if "01" == req["signMethod"]:
         req["certId"] = CertUtil.getSignCertId(signCertPath, signCertPwd)
+
         logging.info("=== start to sign ===")
         prestr = createLinkString(req, True, False)
         logging.info("sorted: [" + prestr + "]")
+
         if "5.0.0" == req["version"]:
             prestr = sha1(prestr)
             logging.info("sha1: [" + prestr + "]")
             logging.info("sign cert: [" + signCertPath + "], pwd: [" + signCertPwd + "]")
+
             key = CertUtil.getSignPriKey(signCertPath, signCertPwd)
-            signature = base64.b64encode(crypto.sign(key, prestr.encode(SDKConfig().encoding), 'sha1'))
+            signature = base64.b64encode(crypto.sign(key, prestr.encode('utf-8'), 'sha1'))
+            signature = signature.decode('utf-8')
             logging.info("signature: [" + signature + "]")
+
         else:
             prestr = sha256(prestr)
             logging.info("sha256: [" + prestr + "]")
             logging.info("sign cert: [" + signCertPath + "], pwd: [" + signCertPwd + "]")
             key = CertUtil.getSignPriKey(signCertPath, signCertPwd)
-            signature = base64.b64encode(crypto.sign(key, prestr.encode(SDKConfig().encoding), 'sha256'))
+            signature = base64.b64encode(crypto.sign(key, prestr.encode('utf-8'), 'sha256'))
+            signature = signature.decode('utf-8')
             logging.info("signature: [" + signature + "]")
+
     elif "11" == req["signMethod"]:
         logging.info("=== start to sign ===")
         prestr = createLinkString(req, True, False)
         logging.info("sorted: [" + prestr + "]")
+
         if secureKey is None:
             logging.error("secureKey must not null")
             return None
@@ -95,21 +109,23 @@ def buildSignature(req, signCertPath=SDKConfig().signCertPath, signCertPwd=SDKCo
         logging.debug("before final sha256: [" + prestr + "]")
         signature = sha256(prestr)
         logging.info("signature: [" + signature + "]")
+
     elif "12" == req["signMethod"]:
-        # logging.info("=== start to sign ===")
-        # prestr = createLinkString(req, True, False)
-        # logging.info("sorted: [" + prestr + "]")
-        # if secureKey is None:
-        #     logging.error("secureKey must not null")
-        #     return None
-        # prestr = prestr + "&" + sm3(secureKey)
-        # logging.debug("before final sm3: [" + prestr + "]")
-        # signature = sm3(prestr)
-        # logging.info("signature: [" + signature + "]")
-        logging.error("sm3算法暂未实现，请勿使用。")
-        return None
+        logging.info("=== start to sign ===")
+        prestr = createLinkString(req, True, False)
+        logging.info("sorted: [" + prestr + "]")
+        if secureKey is None:
+            logging.error("secureKey must not null")
+            return None
+        prestr = prestr + "&" + sm3(secureKey)
+        logging.debug("before final sm3: [" + prestr + "]")
+        signature = sm3(prestr)
+        logging.info("signature: [" + signature + "]")
+
     else:
         logging.info("invalid signMethod: [" + req["signMethod"] + "]")
+        return None
+
     logging.info("=== end of sign ===")
     req["signature"] = signature
     return signature
@@ -118,7 +134,7 @@ def buildSignature(req, signCertPath=SDKConfig().signCertPath, signCertPwd=SDKCo
 def paraFilter(para):
     result = {}
     for key in para.keys():
-        if (key == "signature" or para[key] == ""):
+        if key == "signature" or para[key] == "":
             continue
         else:
             result[key] = para[key]
@@ -126,10 +142,12 @@ def paraFilter(para):
 
 
 def sha1(data):
+    data = data.encode('utf-8')
     return hashlib.sha1(data).hexdigest()
 
 
 def sha256(data):
+    data = data.encode('utf-8')
     return hashlib.sha256(data).hexdigest()
 
 
@@ -179,15 +197,15 @@ def parseQString(respString):
 def verify(resp):
     if "signMethod" not in resp:
         logging.error("signMethod must not null")
-        return None
+        return False
 
     if "version" not in resp:
         logging.error("version must not null")
-        return None
+        return False
 
     if "signature" not in resp:
         logging.error("signature must not null")
-        return None
+        return False
 
     signMethod = resp["signMethod"]
     version = resp["version"]
@@ -195,6 +213,7 @@ def verify(resp):
 
     if "01" == signMethod:
         logging.info("=== start to verify signature ===")
+
         if "5.0.0" == version:
             signature = resp.pop("signature")
             logging.info("signature: [" + signature + "]")
@@ -209,7 +228,7 @@ def verify(resp):
             else:
                 signature = base64.b64decode(signature)
                 try:
-                    crypto.verify(cert, signature, prestr, 'sha1')
+                    crypto.verify(cert, signature, prestr.encode('utf-8'), 'sha1')
                     result = True
                 except Exception:
                     result = False
@@ -227,13 +246,14 @@ def verify(resp):
             else:
                 signature = base64.b64decode(signature)
                 try:
-                    crypto.verify(cert, signature, prestr, 'sha256')
+                    crypto.verify(cert, signature, prestr.encode('utf-8'), 'sha256')
                     result = True
                 except Exception:
                     result = False
         logging.info("verify signature " + "succeed" if result else "fail")
         logging.info("=== end of verify signature ===")
         return result
+
     elif "11" == signMethod or "12" == signMethod:
         return verifyBySecureKey(resp, SDKConfig().secureKey)
     else:
@@ -244,11 +264,11 @@ def verify(resp):
 def verifyBySecureKey(resp, secureKey):
     if "signMethod" not in resp:
         logging.error("signMethod must not null")
-        return None
+        return False
 
     if "signature" not in resp:
         logging.error("signature must not null")
-        return None
+        return False
 
     signMethod = resp["signMethod"]
     result = False
@@ -288,17 +308,17 @@ def verifyAppResponse(jsonData):
     dataMap = parseQString(data)
     vCert = CertUtil.getVerifyCertFromPath(dataMap["cert_id"])
     signature = base64.b64decode(sign)
-    return crypto.verify(vCert, signature, sha1(data), 'sha1')
+    return crypto.verify(vCert, signature, sha1(data).encode('utf-8'), 'sha1')
 
 
 def createAutoFormHtml(params, reqUrl):
     result = "<html>\
 <head>\
-    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=" + SDKConfig().encoding + "\" />\
+    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\" />\
 </head>\
 <body onload=\"javascript:document.pay_form.submit();\">\
     <form id=\"pay_form\" name=\"pay_form\" action=\"" + reqUrl + "\" method=\"post\">"
-    for key, value in params.iteritems():
+    for key, value in params.items():
         result = result + "    <input type=\"hidden\" name=\"" + key + "\" id=\"" + key + "\" value=\"" + value + "\" />\n";
     result = result + "<!-- <input type=\"submit\" type=\"hidden\">-->\
     </form>\
@@ -310,53 +330,59 @@ def createAutoFormHtml(params, reqUrl):
 
 def encryptPub(data, certPath=SDKConfig().encryptCertPath):
     rsaKey = CertUtil.getEncryptKey(certPath)
-    result = rsa.encrypt(data, rsaKey)
+    result = rsa.encrypt(data.encode('utf-8'), rsaKey)
     result = base64.b64encode(result)
-    return result
+    return result.decode('utf-8')
 
 
 def decryptPri(data, certPath=SDKConfig().signCertPath, certPwd=SDKConfig().signCertPwd):
     pkey = CertUtil.getDecryptPriKey(certPath, certPwd)
     data = base64.b64decode(data)
     result = rsa.decrypt(data, pkey)
-    return result
+    return result.decode('utf-8')
 
 
 def deCodeFileContent(params, fileDirectory):
-    if not params.has_key("fileContent"):
+    if ("fileContent" not in params) or (params["fileContent"] is None):
+        logging.error("No file content")
         return False
+
     logging.info("---------处理后台报文返回的文件---------")
     fileContent = params["fileContent"]
-    if not fileContent:
-        logging.info("文件内容为空")
-        return False
-    fileContent = base64.b64decode(fileContent).decode('zlib')  # python3: zlib.decompress(data)
-    filePath = ""
-    if not params.has_key("fileName"):
+    fileContent = base64.b64decode(fileContent)
+    fileContent = zlib.decompress(fileContent)
+
+    if "fileName" not in params:
         logging.info("文件名为空")
-        filePath = fileDirectory + params["merId"] + "_" + params["batchNo"] + "_" + params["txnTime"] + ".txt"
+        fileName = "{}_{}_{}.txt".format(
+            params["merId"], params["batchNo"], params["txnTime"])
     else:
-        filePath = fileDirectory + params['fileName']
-    output = open(filePath, 'wb')
-    output.write(fileContent)
-    logging.info("文件位置 >:" + filePath)
-    output.close()
+        fileName = params['fileName']
+
+    filePath = fileDirectory + fileName
+
+    with open(filePath, 'wb') as f:
+        f.write(fileContent)
+        logging.info("文件位置: " + filePath)
+
     return True
 
 
 def enCodeFileContent(path):
-    file = open(path, "rb")
-    fileContent = file.read()
-    file.close()
-    fileContent = fileContent.encode('zlib')
+    with open(path, 'rb') as f:
+        fileContent = f.read()
+
+    fileContent = zlib.compress(fileContent)
     fileContent = base64.b64encode(fileContent)
-    return fileContent
+
+    return fileContent.decode('utf-8')
 
 
 def getEncryptCert(params):
-    if "encryptPubKeyCert" not in params or "certType" not in params:
+    if ("encryptPubKeyCert" not in params) or ("certType" not in params):
         logging.error("encryptPubKeyCert or certType is null")
         return -1
+
     strCert = params["encryptPubKeyCert"]
     certType = params["certType"]
 
@@ -372,22 +398,23 @@ def getEncryptCert(params):
             try:
                 shutil.move(localCertPath, newLocalCertPath)
             except Exception as e:
-                logging.error("备份旧加密证书失败。" + e)
+                logging.error("备份旧加密证书失败: {}".format(e))
                 return -1
             # 备份成功,进行新证书的存储
             try:
-                f = file(localCertPath, "w+")
-                f.write(strCert)
-                f.close()
+                with open(localCertPath, "w+") as f:
+                    f.write(strCert)
             except Exception as e:
-                logging.error("写入新加密证书失败。" + e)
+                logging.error("写入新加密证书失败: {}".format(e))
                 return -1
 
-            logging.info("save new encryptPubKeyCert success");
-            CertUtil.resetEncryptCertPublicKey();
-            return 1;
+            logging.info("save new encryptPubKeyCert success")
+            CertUtil.resetEncryptCertPublicKey()
+            return 1
+
     elif "02" == certType:
-        return 0;
+        return 0
+
     else:
         logging.error("unknown cerType:" + certType)
         return -1
