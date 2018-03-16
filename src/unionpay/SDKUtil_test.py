@@ -3,6 +3,7 @@ from urllib import parse
 import zlib
 import base64
 from unionpay import SDKUtil
+from unionpay.SDKConfig import SDKConfig
 
 
 class TestSDKUtil(unittest.TestCase):
@@ -36,7 +37,7 @@ class TestSDKUtil(unittest.TestCase):
 
         req_dict['signMethod'] = '01'
         req_dict['version'] = '5.0.0'
-        sign_res = SDKUtil.buildSignature(req_dict, "../certs/acp_test_sign.pfx", "000000")
+        sign_res = SDKUtil.buildSignature(req_dict, SDKConfig().signCertPath, SDKConfig().signCertPwd)
 
         check_sign = ('ClTZLArDgM7rE9KORsgEiCmaPo/8G4xg4SrTJAET9xcymexSSlYDjQMIfhvZ0qgtYzlI'
                       '+fV/5/ZKbnpJD0R2qOsvhT9e+Xb2wZzJFeYJVDNBqlZZLXUcB2kU0ut2fKdHCAcWApoGA1Ks0d5s'
@@ -48,7 +49,7 @@ class TestSDKUtil(unittest.TestCase):
 
         req_dict['signMethod'] = '01'
         req_dict['version'] = '5.1.0'
-        sign_res = SDKUtil.buildSignature(req_dict, "../certs/acp_test_sign.pfx", "000000")
+        sign_res = SDKUtil.buildSignature(req_dict, SDKConfig().signCertPath, SDKConfig().signCertPwd)
         check_sign = ('nCDm51Cju6CG0kvYNKJI0hlMMlPqKn2IftnBFWkeNftrNKxczLB2kAyASv6'
                       'Tr3PeOauGvgzv9KEpBBkZY1f7nhOuv/WfZVEHt4oWmxcd24TrEZ5dDtQb4t'
                       'amzUszl0p+TXDW4tqxzbwjjQ++acYtthLadhG44Cce0Lnno7LWIKDh1Fe6w'
@@ -59,12 +60,12 @@ class TestSDKUtil(unittest.TestCase):
         self.assertEqual(sign_res['signature'], check_sign)
 
         req_dict['signMethod'] = '11'
-        sign_res = SDKUtil.buildSignature(req_dict, "../certs/acp_test_sign.pfx", "000000")
+        sign_res = SDKUtil.buildSignature(req_dict, SDKConfig().signCertPath, SDKConfig().signCertPwd)
         check_sign = 'bda8e705fe9d67022f71e8ca14752abc402368ed142b3bc71837ac9dec99c18e'
         self.assertEqual(sign_res['signature'], check_sign)
 
         req_dict['signMethod'] = '12'
-        sign_res = SDKUtil.buildSignature(req_dict, "../certs/acp_test_sign.pfx", "000000")
+        sign_res = SDKUtil.buildSignature(req_dict, SDKConfig().signCertPath, SDKConfig().signCertPwd)
         check_sign = 'e3d147d4d1b835a3453c7f900acf8ad4370ebea0e750452a4a02db43c398af81'
         self.assertEqual(sign_res['signature'], check_sign)
 
@@ -159,7 +160,7 @@ class TestSDKUtil(unittest.TestCase):
             "fileName": "test.txt",
             "fileContent": file_content,
         }
-        SDKUtil.deCodeFileContent(data_dict, "../files/")
+        SDKUtil.deCodeFileContent(data_dict, SDKConfig().fileDir)
 
     def test_enCodeFileContent(self):
         file_content = "test_data".encode('utf-8')
@@ -174,8 +175,8 @@ class TestSDKUtil(unittest.TestCase):
             "fileName": "test.txt",
             "fileContent": file_content,
         }
-        SDKUtil.deCodeFileContent(data_dict, "../files/")
-        encode_str = SDKUtil.enCodeFileContent("../files/test.txt")
+        SDKUtil.deCodeFileContent(data_dict, SDKConfig().fileDir)
+        encode_str = SDKUtil.enCodeFileContent(SDKConfig().fileDir + "test.txt")
         self.assertEqual(encode_str, "eJwrSS0uiU9JLEkEABL5A7o=")
 
     def test_getEncryptCert(self):

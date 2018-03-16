@@ -47,6 +47,7 @@ class SDKConfig():
         self.backUrl = cf.get("acpsdk.backUrl", "").strip()
         self.encoding = cf.get("acpsdk.encoding", "utf-8").strip()
         self.secureKey = cf.get("acpsdk.secureKey", "").strip()
+        self.fileDir = cf.get("acpsdk.file.dir", ".").strip()
 
     def __setattr__(self, attr, value):
         if hasattr(self, attr):

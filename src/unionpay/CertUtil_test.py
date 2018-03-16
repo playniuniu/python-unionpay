@@ -1,31 +1,34 @@
 import unittest
+from unionpay.SDKConfig import SDKConfig
 from unionpay.CertUtil import CertUtil
 
 
 class TestCertUtil(unittest.TestCase):
     def setUp(self):
-        self.certPath = '../certs/acp_test_sign.pfx'
-        self.certEncPath = '../certs/acp_test_enc.cer'
-        self.certMiddlePath = '../certs/acp_test_middle.cer'
-        self.certRootPath = '../certs/acp_test_root.cer'
+        self.certPath = SDKConfig().signCertPath
+        self.certPassword = SDKConfig().signCertPwd
+        self.certEncPath = SDKConfig().encryptCertPath
+        self.certMiddlePath = SDKConfig().middleCertPath
+        self.certRootPath = SDKConfig().rootCertPath
+        self.certVerifyPath = SDKConfig().validateCertDir + 'verify_test.cer'
 
     ###################################
     # Sign Cert
     ###################################
     def test_initSignCert(self):
-        cert = CertUtil.initSignCert(self.certPath, '000000')
+        cert = CertUtil.initSignCert(self.certPath, self.certPassword)
         self.assertEqual(cert.certId, "68759663125")
 
     def test_getSignPriKey(self):
-        PriKey = CertUtil.getSignPriKey(self.certPath, '000000')
+        PriKey = CertUtil.getSignPriKey(self.certPath, self.certPassword)
         self.assertIsNotNone(PriKey)
 
     def test_getSignCertId(self):
-        certId = CertUtil.getSignCertId(self.certPath, '000000')
+        certId = CertUtil.getSignCertId(self.certPath, self.certPassword)
         self.assertEqual(certId, "68759663125")
 
     def test_getDecryptPriKey(self):
-        PriKey = CertUtil.getDecryptPriKey(self.certPath, '000000')
+        PriKey = CertUtil.getDecryptPriKey(self.certPath, self.certPassword)
         self.assertIsNotNone(PriKey)
 
     ###################################
@@ -50,7 +53,7 @@ class TestCertUtil(unittest.TestCase):
     # Root Cert
     ###################################
     def test_verifyAndGetVerifyCert(self):
-        with open('../certs/verify_test.cer', 'rb') as fs:
+        with open(self.certVerifyPath, 'rb') as fs:
             cert = CertUtil.verifyAndGetVerifyCert(fs.read())
             self.assertIsNotNone(cert)
 
@@ -58,7 +61,7 @@ class TestCertUtil(unittest.TestCase):
     # Tools
     ###################################
     def test_getVerifyCertFromPath(self):
-        cert = CertUtil.getVerifyCertFromPath('68759622183', '../certs/')
+        cert = CertUtil.getVerifyCertFromPath('68759622183', SDKConfig().validateCertDir)
         self.assertIsNotNone(cert)
 
 
