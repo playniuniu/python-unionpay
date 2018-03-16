@@ -28,7 +28,7 @@ def demoTrade():
     req["encryptCertId"] = AcpService.getEncryptCertId()
 
     # 签名示例
-    AcpService.sign(req)
+    req = AcpService.sign(req)
     url = SDKConfig().backTransUrl
 
     # post示例

@@ -157,8 +157,10 @@ def putKeyValueToMap(temp, isKey, key, m):
     else:
         m[str(key)] = temp
 
+    return m
 
-def parseQString(respString):
+
+def parseQString(respDict):
     resp = {}
     temp = ""
     key = ""
@@ -166,7 +168,11 @@ def parseQString(respString):
     isOpen = False
     openName = "\0"
 
-    for curChar in respString:  # 遍历整个带解析的字符串
+    if respDict is None:
+        return {}
+
+    for curChar in respDict:  # 遍历整个带解析的字符串
+        curChar = str(curChar)
         if (isOpen):
             if (curChar == openName):
                 isOpen = False
@@ -184,13 +190,13 @@ def parseQString(respString):
             temp = ""
             isKey = False
         elif (curChar == "&" and not isOpen):  # 如果读取到&分割符
-            putKeyValueToMap(temp, isKey, key, resp)
+            resp = putKeyValueToMap(temp, isKey, key, resp)
             temp = ""
             isKey = True
         else:
             temp = temp + curChar
 
-    putKeyValueToMap(temp, isKey, key, resp)
+    resp = putKeyValueToMap(temp, isKey, key, resp)
     return resp
 
 
