@@ -1,4 +1,5 @@
 from flask import Flask, request
+from urllib import parse
 from demo import frontTradeDemo, frontRcvResponse, backRcvResponse, backTradeDemo, fileDownload, batTrans, \
     batTransQuery, multiCertDemo, multiKeyDemo, frontTradeDemo2, encryptCerUpdateQuery
 
@@ -61,19 +62,30 @@ def multi_key():
 
 @app.route("/frontRcvResponse", methods=['POST'])
 def front_notify():
-    request_data = request.get_data()
-    return frontRcvResponse.notify(request_data)
+    request_dict = parse_response_data(request.get_data())
+    return frontRcvResponse.notify(request_dict)
 
 
 @app.route("/backRcvResponse", methods=['POST'])
 def back_notify():
-    request_data = request.get_data()
-    return backRcvResponse.notify(request_data)
+    request_dict = parse_response_data(request.get_data())
+    return backRcvResponse.notify(request_dict)
 
 
 @app.route("/encryptCerUpdateQuery", methods=['GET'])
 def encCertUpdate():
     return encryptCerUpdateQuery.demoTrade()
+
+
+def parse_response_data(req_data):
+    req_data = req_data.decode('utf-8')
+    req_dict = parse.parse_qs(req_data)
+    res_dict = {}
+
+    for el in req_dict:
+        res_dict[el] = req_dict[el][0]
+
+    return res_dict
 
 
 if __name__ == '__main__':

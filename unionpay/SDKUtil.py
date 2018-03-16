@@ -74,33 +74,33 @@ def buildSignature(req_dict, signCertPath=SDKConfig().signCertPath,
     if "01" == req["signMethod"]:
         req["certId"] = CertUtil.getSignCertId(signCertPath, signCertPwd)
 
-        logging.info("=== start to sign ===")
+        logging.debug("=== start to sign ===")
         prestr = createLinkString(req, True, False)
-        logging.info("sorted: [" + prestr + "]")
+        logging.debug("sorted: [" + prestr + "]")
 
         if "5.0.0" == req["version"]:
             prestr = sha1(prestr)
-            logging.info("sha1: [" + prestr + "]")
-            logging.info("sign cert: [" + signCertPath + "], pwd: [" + signCertPwd + "]")
+            logging.debug("sha1: [" + prestr + "]")
+            logging.debug("sign cert: [" + signCertPath + "], pwd: [" + signCertPwd + "]")
 
             key = CertUtil.getSignPriKey(signCertPath, signCertPwd)
             signature = base64.b64encode(crypto.sign(key, prestr.encode('utf-8'), 'sha1'))
             signature = signature.decode('utf-8')
-            logging.info("signature: [" + signature + "]")
+            logging.debug("signature: [" + signature + "]")
 
         else:
             prestr = sha256(prestr)
-            logging.info("sha256: [" + prestr + "]")
-            logging.info("sign cert: [" + signCertPath + "], pwd: [" + signCertPwd + "]")
+            logging.debug("sha256: [" + prestr + "]")
+            logging.debug("sign cert: [" + signCertPath + "], pwd: [" + signCertPwd + "]")
             key = CertUtil.getSignPriKey(signCertPath, signCertPwd)
             signature = base64.b64encode(crypto.sign(key, prestr.encode('utf-8'), 'sha256'))
             signature = signature.decode('utf-8')
-            logging.info("signature: [" + signature + "]")
+            logging.debug("signature: [" + signature + "]")
 
     elif "11" == req["signMethod"]:
-        logging.info("=== start to sign ===")
+        logging.debug("=== start to sign ===")
         prestr = createLinkString(req, True, False)
-        logging.info("sorted: [" + prestr + "]")
+        logging.debug("sorted: [" + prestr + "]")
 
         if secureKey is None:
             logging.error("secureKey must not null")
@@ -108,25 +108,25 @@ def buildSignature(req_dict, signCertPath=SDKConfig().signCertPath,
         prestr = prestr + "&" + sha256(secureKey)
         logging.debug("before final sha256: [" + prestr + "]")
         signature = sha256(prestr)
-        logging.info("signature: [" + signature + "]")
+        logging.debug("signature: [" + signature + "]")
 
     elif "12" == req["signMethod"]:
-        logging.info("=== start to sign ===")
+        logging.debug("=== start to sign ===")
         prestr = createLinkString(req, True, False)
-        logging.info("sorted: [" + prestr + "]")
+        logging.debug("sorted: [" + prestr + "]")
         if secureKey is None:
             logging.error("secureKey must not null")
             return None
         prestr = prestr + "&" + sm3(secureKey)
         logging.debug("before final sm3: [" + prestr + "]")
         signature = sm3(prestr)
-        logging.info("signature: [" + signature + "]")
+        logging.debug("signature: [" + signature + "]")
 
     else:
-        logging.info("invalid signMethod: [" + req["signMethod"] + "]")
+        logging.error("invalid signMethod: [" + req["signMethod"] + "]")
         return None
 
-    logging.info("=== end of sign ===")
+    logging.debug("=== end of sign ===")
     req["signature"] = signature
     return req
 
@@ -212,18 +212,18 @@ def verify(resp):
     result = False
 
     if "01" == signMethod:
-        logging.info("=== start to verify signature ===")
+        logging.debug("=== start to verify signature ===")
 
         if "5.0.0" == version:
             signature = resp.pop("signature")
-            logging.info("signature: [" + signature + "]")
+            logging.debug("signature: [" + signature + "]")
             prestr = createLinkString(resp, True, False)
-            logging.info("sorted: [" + prestr + "]")
+            logging.debug("sorted: [" + prestr + "]")
             prestr = sha1(prestr)
-            logging.info("sha1: [" + prestr + "]")
+            logging.debug("sha1: [" + prestr + "]")
             cert = CertUtil.getVerifyCertFromPath(resp["certId"])
             if cert is None:
-                logging.info("no cert was found by certId: " + resp["certId"])
+                logging.warning("no cert was found by certId: " + resp["certId"])
                 result = False
             else:
                 signature = base64.b64decode(signature)
@@ -234,14 +234,14 @@ def verify(resp):
                     result = False
         else:
             signature = resp.pop("signature")
-            logging.info("signature: [" + signature + "]")
+            logging.debug("signature: [" + signature + "]")
             prestr = createLinkString(resp, True, False)
-            logging.info("sorted: [" + prestr + "]")
+            logging.debug("sorted: [" + prestr + "]")
             prestr = sha256(prestr)
-            logging.info("sha256: [" + prestr + "]")
+            logging.debug("sha256: [" + prestr + "]")
             cert = CertUtil.verifyAndGetVerifyCert(resp["signPubKeyCert"])
             if cert is None:
-                logging.info("no cert was found by signPubKeyCert: " + resp["signPubKeyCert"])
+                logging.warning("no cert was found by signPubKeyCert: " + resp["signPubKeyCert"])
                 result = False
             else:
                 signature = base64.b64decode(signature)
@@ -250,14 +250,14 @@ def verify(resp):
                     result = True
                 except Exception:
                     result = False
-        logging.info("verify signature " + "succeed" if result else "fail")
-        logging.info("=== end of verify signature ===")
+        logging.debug("verify signature " + "succeed" if result else "fail")
+        logging.debug("=== end of verify signature ===")
         return result
 
     elif "11" == signMethod or "12" == signMethod:
         return verifyBySecureKey(resp, SDKConfig().secureKey)
     else:
-        logging.info("Error signMethod [" + signMethod + "] in validate. ")
+        logging.error("Error signMethod [" + signMethod + "] in validate. ")
         return False
 
 
@@ -273,12 +273,12 @@ def verifyBySecureKey(resp, secureKey):
     signMethod = resp["signMethod"]
     result = False
 
-    logging.info("=== start to verify signature ===")
+    logging.debug("=== start to verify signature ===")
     if "11" == signMethod:
         signature = resp.pop("signature")
-        logging.info("signature: [" + signature + "]")
+        logging.debug("signature: [" + signature + "]")
         prestr = createLinkString(resp, True, False)
-        logging.info("sorted: [" + prestr + "]")
+        logging.debug("sorted: [" + prestr + "]")
         beforeSha256 = prestr + "&" + sha256(secureKey)
         logging.debug("before final sha256: [" + beforeSha256 + "]")
         afterSha256 = sha256(beforeSha256)
@@ -287,17 +287,17 @@ def verifyBySecureKey(resp, secureKey):
             logging.debug("after final sha256: [" + afterSha256 + "]")
     elif "12" == signMethod:
         signature = resp.pop("signature")
-        logging.info("signature: [" + signature + "]")
+        logging.debug("signature: [" + signature + "]")
         prestr = createLinkString(resp, True, False)
-        logging.info("sorted: [" + prestr + "]")
+        logging.debug("sorted: [" + prestr + "]")
         beforeSm3 = prestr + "&" + sm3(secureKey)
         logging.debug("before final sm3: [" + beforeSm3 + "]")
         afterSm3 = sm3(beforeSm3)
         result = afterSm3 == signature
         if not result:
             logging.debug("after final sha256: [" + afterSm3 + "]")
-    logging.info("verify signature " + "succeed" if result else "fail")
-    logging.info("=== end of verify signature ===")
+    logging.debug("verify signature " + "succeed" if result else "fail")
+    logging.debug("=== end of verify signature ===")
     return result
 
 
@@ -324,7 +324,6 @@ def createAutoFormHtml(params, reqUrl):
     </form>\
 </body>\
 </html>"
-    logging.info("auto post html:" + result)
     return result
 
 
@@ -353,7 +352,7 @@ def deCodeFileContent(params, fileDirectory):
     fileContent = zlib.decompress(fileContent)
 
     if "fileName" not in params:
-        logging.info("文件名为空")
+        logging.debug("文件名为空")
         fileName = "{}_{}_{}.txt".format(
             params["merId"], params["batchNo"], params["txnTime"])
     else:
