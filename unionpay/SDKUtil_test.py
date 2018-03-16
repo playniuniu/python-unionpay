@@ -44,7 +44,7 @@ class TestSDKUtil(unittest.TestCase):
                       'VFYdzzSQ6pAnlYfKzhby3p5/YFdZZHcYDbdrkQjS+ewgf6wQfFGu5X07BznqYjf6I6x25jPgidg6'
                       'OHE0m25uv2ksyZuEKwSM/WWUYOc0q/TF7XMhN1lpm3VZN8ePvIK5NPHPaA==')
 
-        self.assertEqual(sign_res, check_sign)
+        self.assertEqual(sign_res['signature'], check_sign)
 
         req_dict['signMethod'] = '01'
         req_dict['version'] = '5.1.0'
@@ -56,21 +56,17 @@ class TestSDKUtil(unittest.TestCase):
                       'SeAMFMmxMToUmY+doQHla5GNkI4VJox10LIZBlA8SRTwL6qt3kdHhFyP7mR'
                       'w2WbjzUA9kuqPtFhC7ucKJ5tFG1YmbnX5upg0Mg9h2UlofQ==')
 
-        self.assertEqual(sign_res, check_sign)
+        self.assertEqual(sign_res['signature'], check_sign)
 
         req_dict['signMethod'] = '11'
         sign_res = SDKUtil.buildSignature(req_dict, "../certs/acp_test_sign.pfx", "000000")
         check_sign = 'bda8e705fe9d67022f71e8ca14752abc402368ed142b3bc71837ac9dec99c18e'
-        self.assertEqual(sign_res, check_sign)
+        self.assertEqual(sign_res['signature'], check_sign)
 
         req_dict['signMethod'] = '12'
         sign_res = SDKUtil.buildSignature(req_dict, "../certs/acp_test_sign.pfx", "000000")
         check_sign = 'e3d147d4d1b835a3453c7f900acf8ad4370ebea0e750452a4a02db43c398af81'
-        self.assertEqual(sign_res, check_sign)
-
-        req_dict['signMethod'] = '123'
-        sign_res = SDKUtil.buildSignature(req_dict, "../certs/acp_test_sign.pfx", "000000")
-        self.assertIsNone(sign_res)
+        self.assertEqual(sign_res['signature'], check_sign)
 
     def test_paraFilter(self):
         test_dict = {"signature": "111", "transType": "01", "sysReserved": "{aaa=a&bbb=b}", "merId": "888888888888888"}

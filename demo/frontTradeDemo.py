@@ -40,7 +40,7 @@ def getDemoHtml():
     req["encryptCertId"] = AcpService.getEncryptCertId()
 
     # 签名示例
-    AcpService.sign(req)
+    req = AcpService.sign(req)
     url = SDKConfig().frontTransUrl
 
     # 前台自提交表单示例

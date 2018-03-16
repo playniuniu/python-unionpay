@@ -11,21 +11,21 @@ class AcpService():
         '''
         签名，证书路径和密码从配置文件读
         '''
-        SDKUtil.buildSignature(req, certPath, certPwd)
+        return SDKUtil.buildSignature(req, certPath, certPwd)
 
     @staticmethod
     def signByCertInfo(req, certPath, certPwd):
         '''
         签名，证书路径和密码从配置文件读
         '''
-        SDKUtil.buildSignature(req, certPath, certPwd)
+        return SDKUtil.buildSignature(req, certPath, certPwd)
 
     @staticmethod
     def signBySecureKey(req, secureKey):
         '''
         签名，证书路径和密码从配置文件读
         '''
-        SDKUtil.buildSignature(req, secureKey=secureKey)
+        return SDKUtil.buildSignature(req, secureKey=secureKey)
 
     @staticmethod
     def validate(resp):

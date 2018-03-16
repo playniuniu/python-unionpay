@@ -128,7 +128,7 @@ def buildSignature(req_dict, signCertPath=SDKConfig().signCertPath,
 
     logging.info("=== end of sign ===")
     req["signature"] = signature
-    return signature
+    return req
 
 
 def paraFilter(para):
@@ -320,7 +320,7 @@ def createAutoFormHtml(params, reqUrl):
     <form id=\"pay_form\" name=\"pay_form\" action=\"" + reqUrl + "\" method=\"post\">"
     for key, value in params.items():
         result = result + "    <input type=\"hidden\" name=\"" + key + "\" id=\"" + key + "\" value=\"" + value + "\" />\n";
-    result = result + "<input type=\"submit\">submit</input>\
+    result = result + "<input type=\"submit\"></input>\
     </form>\
 </body>\
 </html>"
