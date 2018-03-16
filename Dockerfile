@@ -9,6 +9,7 @@ RUN apk add --no-cache --update python3 $BUILD_DEP \
     && pip3 install -U pip \
     && pip3 install -r /opt/src/requirments.txt \
     && chmod +x /opt/src/run.py \
+    && mkdir -p /opt/src/files \
     && apk del $BUILD_DEP \
     && rm -rf /var/cache/apk/* \
     && rm -rf /root/.cache/pip/*
