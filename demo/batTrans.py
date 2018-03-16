@@ -23,10 +23,10 @@ def trade():
     req["batchNo"] = "0001"
     req["totalQty"] = "10"
     req["totalAmt"] = "1000"
-    req["fileContent"] = AcpService.enCodeFileContent("d:/file/DF00000000777290058110097201507140002I.txt")
+    req["fileContent"] = AcpService.enCodeFileContent("./files/bat.txt")
 
     # 签名示例
-    AcpService.sign(req)
+    req = AcpService.sign(req)
     url = SDKConfig().batchTransUrl
 
     # post示例

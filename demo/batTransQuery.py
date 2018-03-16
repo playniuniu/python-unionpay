@@ -23,7 +23,7 @@ def trade():
     req["batchNo"] = "0001"
 
     # 签名示例
-    AcpService.sign(req)
+    req = AcpService.sign(req)
     url = SDKConfig().batchTransUrl
 
     # post示例

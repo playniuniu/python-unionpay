@@ -27,7 +27,7 @@ def demoTrade():
     req["txnTime"] = datetime.now().strftime('%Y%m%d%H%M%S')
 
     # 签名示例
-    AcpService.sign(req)
+    req = AcpService.sign(req)
     url = SDKConfig().backTransUrl
 
     # post示例

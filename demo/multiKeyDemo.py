@@ -24,7 +24,7 @@ def trade():
     req["accNo"] = "6226090000000048"
 
     # 签名示例
-    AcpService.signBySecureKey(req, "88888888")
+    req = AcpService.signBySecureKey(req, "88888888")
     url = SDKConfig().backTransUrl
 
     # post示例
