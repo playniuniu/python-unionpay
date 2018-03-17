@@ -10,7 +10,7 @@
 Docker 方式
 
 ```bash
-docker run -d -p 8000:8000 playniuniu/unionpay
+docker run -d -p 5000:5000 playniuniu/unionpay
 ```
 
 Python3 方式
