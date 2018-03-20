@@ -2,6 +2,7 @@ from flask import Flask, request
 from urllib import parse
 from . import frontTradeDemo, frontRcvResponse, backRcvResponse, backTradeDemo, fileDownload, batTrans, \
     batTransQuery, multiCertDemo, multiKeyDemo, frontTradeDemo2, encryptCerUpdateQuery
+from . import b2bFrontTradeDemo, b2bRefundDemo, b2bQueryTrade
 
 
 def create_app():
@@ -18,7 +19,11 @@ def create_app():
                "<a href='batTransQuery'>批量查询示例</a><br>\n" \
                "<a href='multiCertDemo'>多证书示例</a><br>\n" \
                "<a href='multiKeyDemo'>多密钥示例</a><br>\n" \
-               "<a href='encryptCerUpdateQuery'>加密证书更新示例</a><br>\n"
+               "<a href='encryptCerUpdateQuery'>加密证书更新示例</a><br>\n" \
+               "<br>\n" \
+               "<a href='b2bFrontTradeDemo'>B2B 前台交易示例</a><br>\n" \
+               "<a href='b2QueryTradeDemo'>B2B 交易查询</a><br>\n" \
+               "<a href='b2bRefundTradeDemo'>B2B 退款示例</a><br>\n"
 
     @app.route("/frontTradeDemo", methods=['GET'])
     def front_trade():
@@ -65,6 +70,18 @@ def create_app():
     @app.route("/encryptCerUpdateQuery", methods=['GET'])
     def encCertUpdate():
         return encryptCerUpdateQuery.demoTrade()
+
+    @app.route("/b2bFrontTradeDemo", methods=['GET'])
+    def b2b_front_trade():
+        return b2bFrontTradeDemo.getDemoHtml()
+
+    @app.route("/b2QueryTradeDemo", methods=['GET'])
+    def b2b_query_trade():
+        return b2bQueryTrade.trade()
+
+    @app.route("/b2bRefundTradeDemo", methods=['GET'])
+    def b2b_refund_trade():
+        return b2bRefundDemo.trade()
 
     def parse_response_data(req_data):
         req_data = req_data.decode('utf-8')
