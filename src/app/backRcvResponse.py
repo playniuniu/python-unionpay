@@ -3,8 +3,8 @@ import logging
 
 
 def notify(params):
-    logging.info("notify req:[" + reqStr(params) + "]")
-    result = "收到通知：" + reqStr(params) + "<br>\n"
+    logging.info("background notify req:[" + reqStr(params) + "]")
+    result = "后台收到通知：" + reqStr(params) + "<br>\n"
     if (AcpService.validate(params)):
         # 服务器签名验证成功
         # 请在这里加上商户的业务逻辑程序代码
